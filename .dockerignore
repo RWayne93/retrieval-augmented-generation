@@ -1,0 +1,13 @@
+models/
+.env
+.DS_Store
+.gitignore
+requirements.txt
+assets/
+data/
+experimental/
+.gitiignore
+app_conv.py
+environment.yaml
+.flake8
+.github/

@@ -1,6 +1,6 @@
-DEVICE: mps
+DEVICE: cpu
 
-VERBOSE_LOGGING: False 
+VERBOSE_LOGGING: False  
 
 CHUNK_SIZE: 1000
 CHUNK_OVERLAP: 150
@@ -27,7 +27,8 @@ USE_OPENAI: False
 # VECTORDB_TYPE: chroma
 # VECTORDB_PATH: vectordb/chroma
 VECTORDB_TYPE: pgvector
-VECTORDB_PATH: postgresql+psycopg2://postgres:mysecretpassword@localhost:5432/postgres
+VECTORDB_PATH: postgresql+psycopg2://postgres:mysecretpassword@host.docker.internal:5432/postgres
+#VECTORDB_PATH: postgresql+psycopg2://postgres:mysecretpassword@localhost:5432/postgres
 COLLECTION_NAME: pdf_document_chunks
 
 # USE_CTRANSFORMERS: True
@@ -39,8 +40,8 @@ COLLECTION_NAME: pdf_document_chunks
 # PROMPT_TYPE: mistral
 
 USE_CTRANSFORMERS: False
-#LLM_PATH: openhermes-2.5-mistral-7b.Q4_K_M.gguf
-LLM_PATH: openhermes-2.5-mistral-7b.Q8_0.gguf
+LLM_PATH: openhermes-2.5-mistral-7b.Q4_K_M.gguf
+# LLM_PATH: openhermes-2.5-mistral-7b.Q8_0.gguf
 PROMPT_TYPE: ChatML
 
 # USE_CTRANSFORMERS: True

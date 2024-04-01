@@ -35,15 +35,18 @@ def build_llm():
                 "context_length": CFG.LLM_CONFIG.CONTEXT_LENGTH,
             },
         )
+    config = {
+        "max_tokens": CFG.LLM_CONFIG.MAX_NEW_TOKENS,
+        "temperature": CFG.LLM_CONFIG.TEMPERATURE,
+        "repeat_penalty": CFG.LLM_CONFIG.REPETITION_PENALTY,
+        "n_ctx": CFG.LLM_CONFIG.CONTEXT_LENGTH,
+    }
+    if CFG.DEVICE != "cpu":
+        config["n_gpu_layers"] = CFG.LLM_CONFIG.N_GPU_LAYERS
+
     return build_llamacpp(
         os.path.join(CFG.MODELS_DIR, CFG.LLM_PATH),
-        config={
-            "max_tokens": CFG.LLM_CONFIG.MAX_NEW_TOKENS,
-            "temperature": CFG.LLM_CONFIG.TEMPERATURE,
-            "repeat_penalty": CFG.LLM_CONFIG.REPETITION_PENALTY,
-            "n_ctx": CFG.LLM_CONFIG.CONTEXT_LENGTH,
-            "n_gpu_layers": CFG.LLM_CONFIG.N_GPU_LAYERS,
-        },
+        config=config,
     )
 
 
