@@ -22,6 +22,12 @@ Activate the environment.
 conda activate rag
 ```
 
+Or you can install via poetry 
+
+```bash
+poetry install
+```
+
 ### Download model artefacts
 
 Download and save the models in `./models` and update `config.yaml`. The models used in this demo are:
