@@ -4,9 +4,12 @@ version = "0.1.0"
 description = "demo of rag in python"
 readme = "README.md"
 package-mode = false
+license = "Apache-2.0 license"
+authors = ["Kok-Meng Tan "]
 
 [tool.poetry.dependencies]
-python = "^3.11.4"
+python = ">=3.11.4,<3.13"
+psycopg2-binary = "^2.9.9"
 chromadb = "^0.4.24"
 ctransformers = "^0.2.27"
 faiss-cpu = "^1.8.0"
@@ -21,3 +24,5 @@ torch = "^2.2.1"
 transformers = "^4.38.2"
 umap-learn = "^0.5.5"
 arize-phoenix = {version = "3.16.0", extras = ["evals"]}
+llama-cpp-python = "0.2.56"
+pgvector = "^0.2.5"
