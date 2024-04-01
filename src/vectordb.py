@@ -5,6 +5,7 @@ import os
 import pickle
 import uuid
 from typing import Any, Optional, Sequence
+import hashlib
 
 from chromadb.config import Settings
 from langchain.embeddings.base import Embeddings
@@ -12,16 +13,30 @@ from langchain.schema import Document
 from langchain.vectorstores.base import VectorStore
 from langchain.text_splitter import RecursiveCharacterTextSplitter
 from langchain_community.document_loaders.pdf import PyMuPDFLoader
-from langchain_community.vectorstores import FAISS, Chroma
+from langchain_community.vectorstores import FAISS, Chroma, PGVector
 
 from src import CFG, logger
 from src.embeddings import build_base_embeddings
+import psycopg2
+from urllib.parse import urlparse
 
+def check_pgvector_connection(connection_string):
+    try:
+        # Parse the connection string
+        result = urlparse(connection_string)
+        dsn = f"dbname={result.path[1:]} user={result.username} password={result.password} host={result.hostname} port={result.port}"
+        conn = psycopg2.connect(dsn)
+        conn.close()  
+        return True
+    except Exception as e:
+        print(f"Failed to connect to the database: {e}")
+        return False
 
-def build_vectordb(filename: str) -> None:
+def build_vectordb(filename: str, embedding_function: Optional[Embeddings] = None) -> None:
     """Builds a vector database from a PDF file."""
     doc = PyMuPDFLoader(filename).load()
-    embedding_function = build_base_embeddings()
+    if embedding_function is None:
+        embedding_function = build_base_embeddings()
 
     if CFG.TEXT_SPLIT_MODE == "simple":
         docs = simple_text_split(doc, CFG.CHUNK_SIZE, CFG.CHUNK_OVERLAP)
@@ -50,7 +65,16 @@ def simple_text_split(
         separators=CFG.SEPARATORS,
         length_function=len,
     )
-    return text_splitter.split_documents(doc)
+    chunks = text_splitter.split_documents(doc)
+
+    # Assign a more unique identifier to each chunk's metadata
+    for index, chunk in enumerate(chunks):
+        if not hasattr(chunk, 'metadata'):
+            chunk.metadata = {}  # Initialize metadata if it doesn't exist
+        unique_identifier = hashlib.sha256(f"{str(uuid.uuid4())}{index}".encode()).hexdigest()
+        chunk.metadata['uuid'] = unique_identifier
+
+    return chunks
 
 
 def parent_document_split(
@@ -59,7 +83,7 @@ def parent_document_split(
     """ParentDocumentRetriever"""
     id_key = "doc_id"
 
-    parent_docs = simple_text_split(doc, 2000, 0)
+    parent_docs = simple_text_split(doc, 1500, 100)
     doc_ids = [str(uuid.uuid4()) for _ in parent_docs]
 
     child_docs = []
@@ -85,7 +109,6 @@ def propositionize(doc: Sequence[Document]) -> Sequence[Document]:
     prop_texts = propositionizer.batch(texts)
     return prop_texts
 
-
 def save_vectorstore(
     docs: Sequence[Document],
     embedding_function: Embeddings,
@@ -93,7 +116,8 @@ def save_vectorstore(
     vectordb_type: str,
 ) -> None:
     """Saves a vector database to disk."""
-    logger.info(f"persist_directory = {persist_directory}")
+    if CFG.VERBOSE_LOGGING:
+        logger.info(f"persist_directory = {persist_directory}")
 
     if vectordb_type == "faiss":
         vectorstore = FAISS.from_documents(docs, embedding_function)
@@ -105,9 +129,15 @@ def save_vectorstore(
             persist_directory=persist_directory,
             client_settings=Settings(anonymized_telemetry=False, is_persistent=True),
         )
+    elif vectordb_type == "pgvector":
+       _ = PGVector.from_documents(
+            docs,
+            embedding_function,
+            collection_name=CFG.COLLECTION_NAME,
+            connection_string=CFG.VECTORDB_PATH,
+        )
     else:
         raise NotImplementedError
-
 
 def load_faiss(
     embedding_function: Embeddings, persist_directory: Optional[str] = None
@@ -120,7 +150,6 @@ def load_faiss(
     return FAISS.load_local(
         persist_directory, embedding_function, allow_dangerous_deserialization=True
     )
-
 
 def load_chroma(
     embedding_function: Embeddings, persist_directory: Optional[str] = None
@@ -136,6 +165,16 @@ def load_chroma(
         persist_directory=persist_directory,
         embedding_function=embedding_function,
         client_settings=Settings(anonymized_telemetry=False, is_persistent=True),
+    )
+
+def load_pgvector(
+        embedding_function: Embeddings, connection_string: str, collection_name: str
+        ) -> VectorStore:
+    """Loads a PGVector index from disk."""
+    return PGVector(
+        connection_string=connection_string,
+        embedding_function=embedding_function,
+        collection_name=collection_name
     )
 
 

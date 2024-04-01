@@ -13,9 +13,12 @@ from src.retrieval_qa import (
     build_rerank_retriever,
     build_compression_retriever,
 )
-from src.vectordb import build_vectordb, load_faiss, load_chroma
+from src.vectordb import build_vectordb, load_faiss, load_chroma, load_pgvector, check_pgvector_connection
 from streamlit_app.pdf_display import get_doc_highlighted, display_pdf
 from streamlit_app.utils import perform, load_base_embeddings, load_llm, load_reranker
+
+import phoenix as px
+from phoenix.trace.langchain import LangChainInstrumentor
 
 st.set_page_config(page_title="Retrieval QA", layout="wide")
 
@@ -23,13 +26,22 @@ LLM = load_llm()
 BASE_EMBEDDINGS = load_base_embeddings()
 RERANKER = load_reranker()
 
+if 'phoenix_initialized' not in st.session_state:
+    session = px.launch_app()
+    phoenix_tracer = LangChainInstrumentor().instrument()
+    # Mark Phoenix as initialized in this session
+    st.session_state['phoenix_initialized'] = True
+
 
 @st.cache_resource
 def load_vectordb():
+    print("Loading vectordb")
     if CFG.VECTORDB_TYPE == "faiss":
         return load_faiss(BASE_EMBEDDINGS)
     if CFG.VECTORDB_TYPE == "chroma":
         return load_chroma(BASE_EMBEDDINGS)
+    if CFG.VECTORDB_TYPE == "pgvector":
+        return load_pgvector(BASE_EMBEDDINGS, CFG.VECTORDB_PATH, CFG.COLLECTION_NAME)
     raise NotImplementedError
 
 
@@ -41,6 +53,8 @@ def load_vectordb_hyde():
         return load_faiss(hyde_embeddings)
     if CFG.VECTORDB_TYPE == "chroma":
         return load_chroma(hyde_embeddings)
+    if CFG.VECTORDB_TYPE == "pgvector":
+        return load_pgvector(hyde_embeddings, CFG.VECTORDB_PATH, CFG.COLLECTION_NAME)
     raise NotImplementedError
 
 
@@ -96,7 +110,13 @@ def doc_qa():
         if st.session_state.uploaded_filename != "":
             st.info(f"Current document: {st.session_state.uploaded_filename}")
 
-        if not os.path.exists(CFG.VECTORDB_PATH):
+        vectordb_ready = False
+        if CFG.VECTORDB_TYPE == "pgvector":
+            vectordb_ready = check_pgvector_connection(CFG.VECTORDB_PATH)
+        else:
+            vectordb_ready = os.path.exists(CFG.VECTORDB_PATH)
+
+        if not vectordb_ready:
             st.info("Please build VectorDB first.")
             st.stop()
 
@@ -190,13 +210,18 @@ def doc_qa():
         with c1:
             st.write("#### Sources")
             for row in st.session_state.last_response["source_documents"]:
-                st.write("**Page {}**".format(row.metadata["page"] + 1))
+                if 'page' in row.metadata:
+                    st.write("**Page {}**".format(row.metadata["page"] + 1))
+                else:
+                    st.write("**Page information not available**")
                 st.info(row.page_content.replace("$", r"\$"))
 
             # Display PDF
             st.write("---")
             _display_pdf_from_docs(st.session_state.last_response["source_documents"])
-
+    
+    
+    
 
 def _display_pdf_from_docs(source_documents):
     n = len(source_documents)

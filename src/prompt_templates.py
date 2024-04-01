@@ -1,5 +1,9 @@
 from src import CFG
 
+gpt_4_format = """User: {user}
+Assistant: {system}
+"""
+
 llama_format = """<s>[INST] <<SYS>>{system}<</SYS>>
 {user}
 [/INST]"""
@@ -19,6 +23,12 @@ gemma_format = """<start_of_turn>user
 {user}<end_of_turn>
 <start_of_turn>model"""
 
+ChatML_format = """<|im_start|>system
+
+{system}<|im_end|>
+<|im_start|>user
+{user}<|im_end|>
+<|im_start|>assistant"""
 
 if CFG.PROMPT_TYPE == "llama":
     _chat_format = llama_format
@@ -28,6 +38,10 @@ elif CFG.PROMPT_TYPE == "zephyr":
     _chat_format = zephyr_format
 elif CFG.PROMPT_TYPE == "gemma":
     _chat_format = zephyr_format
+elif CFG.PROMPT_TYPE == "ChatML":
+    _chat_format = ChatML_format
+elif CFG.PROMPT_TYPE == "gpt-4":
+    _chat_format = gpt_4_format
 else:
     raise NotImplementedError
 
