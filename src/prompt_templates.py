@@ -23,11 +23,19 @@ gemma_format = """<start_of_turn>user
 {user}<end_of_turn>
 <start_of_turn>model"""
 
-ChatML_format = """<|im_start|>system
+# ChatML_format = """<|im_start|>{user}
+# hello<|im_end|>
+# <|im_start|>{system}
+# response<|im_end|>
+# <|im_start|>{user}
+# again<|im_end|>
+# <|im_start|>{system}
+# response<|im_end|>"""
 
+ChatML_format = """<|im_start|>{user}
 {system}<|im_end|>
-<|im_start|>user
-{user}<|im_end|>
+<|im_start|>{user}
+{system}<|im_end|>
 <|im_start|>assistant"""
 
 if CFG.PROMPT_TYPE == "llama":

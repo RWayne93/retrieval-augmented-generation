@@ -28,6 +28,18 @@ Or you can install via poetry
 poetry install
 ```
 
+## Notes on llama-cpp-python
+
+If you want to use llama-cpp-python with GPU support on an NVIDIA based system you need to compile with cuda. 
+When using poetry you need to comment the llama-cpp-python dependency in `pyproject.toml`. and install with pip inside poetry shell.
+
+```
+CUDACXX=/usr/local/cuda-12/bin/nvcc 
+CMAKE_ARGS="-DLLAMA_CUBLAS=on -DCMAKE_CUDA_ARCHITECTURES=all-major"
+FORCE_CMAKE=1
+pip3 install llama-cpp-python==0.2.56 --no-cache-dir --force-reinstall --upgrade
+```
+
 ### Download model artefacts
 
 Download and save the models in `./models` and update `config.yaml`. The models used in this demo are:

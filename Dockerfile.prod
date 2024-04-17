@@ -1,0 +1,223 @@
+# # Stage 1: Builder image
+# FROM debian:buster as builder
+
+# # Install build dependencies
+# RUN apt-get update && apt-get install -y \
+#     wget \
+#     build-essential \
+#     libffi-dev \
+#     libssl-dev \
+#     python3 \
+#     python3-pip \
+#     && rm -rf /var/lib/apt/lists/*
+
+# RUN pip3 install --upgrade pip && \
+#     curl -sSL https://install.python-poetry.org | python3 -
+
+# # Install CUDA toolkit
+# RUN apt-get update && apt-get install -y software-properties-common && \
+#     wget https://developer.download.nvidia.com/compute/cuda/12.3.1/local_installers/cuda-repo-debian12-12-3-local_12.3.1-545.23.08-1_amd64.deb && \
+#     dpkg -i cuda-repo-debian12-12-3-local_12.3.1-545.23.08-1_amd64.deb && \
+#     cp /var/cuda-repo-debian12-12-3-local/cuda-*-keyring.gpg /usr/share/keyrings/ && \
+#     apt-get update && apt-get -y install cuda-toolkit-12-3 && \
+#     rm -rf /var/lib/apt/lists/*
+
+# # Set CUDA compiler and build flags
+# ENV CUDACXX=/usr/local/cuda-12/bin/nvcc 
+# ENV CMAKE_ARGS="-DLLAMA_CUBLAS=on -DCMAKE_CUDA_ARCHITECTURES=all-major"
+# ENV FORCE_CMAKE=1
+
+# # Add source code
+# WORKDIR /build
+# COPY . .
+
+# # Install llama-cpp-python with specific flags
+# RUN pip3 install --no-cache-dir -r requirements.txt
+# RUN pip3 install llama-cpp-python --no-cache-dir --force-reinstall --upgrade
+
+# # Stage 2: Slim Python runtime
+# FROM python:3.12.2-slim
+
+# # Copy necessary binaries and libraries from the builder
+# COPY --from=builder /usr/bin/wget /usr/bin/
+# COPY --from=builder /usr/lib/x86_64-linux-gnu/libffi.so.6 /usr/lib/x86_64-linux-gnu/
+# COPY --from=builder /usr/lib/x86_64-linux-gnu/libssl.so.1.1 /usr/lib/x86_64-linux-gnu/
+
+# # Set environment variables
+# ENV PYTHONDONTWRITEBYTECODE=1 \
+#     PYTHONUNBUFFERED=1
+
+# WORKDIR /app
+
+# # Install Python dependencies in the final stage
+# COPY --from=builder /build/requirements.txt /app/
+# RUN pip install --no-cache-dir -r requirements.txt
+
+# # Assuming you need the 'dist' folder in runtime
+# COPY . /app
+
+# EXPOSE 8501
+
+# CMD ["streamlit", "run", "app_qa.py", "--server.address=0.0.0.0"]
+
+
+
+
+
+
+
+
+#Stage 1: Builder image
+#FROM debian:buster as builder
+# FROM python:3.12.2-slim as builder
+
+# # Install build dependencies and Python
+# RUN apt-get update && apt-get install -y \
+#     wget \
+#     build-essential \
+#     libffi-dev \
+#     libssl-dev \
+#     python3 \
+#     python3-pip \
+#     git \
+#     && rm -rf /var/lib/apt/lists/*
+
+# # Install CUDA toolkit
+# RUN apt-get update && apt-get install -y software-properties-common && \
+#     wget https://developer.download.nvidia.com/compute/cuda/12.3.1/local_installers/cuda-repo-debian12-12-3-local_12.3.1-545.23.08-1_amd64.deb && \
+#     dpkg -i cuda-repo-debian12-12-3-local_12.3.1-545.23.08-1_amd64.deb && \
+#     cp /var/cuda-repo-debian12-12-3-local/cuda-*-keyring.gpg /usr/share/keyrings/ && \
+#     apt-get update && apt-get -y install cuda-toolkit-12-3 && \
+#     rm -rf /var/lib/apt/lists/*
+
+# # Set CUDA compiler and build flags
+# ENV CUDACXX=/usr/local/cuda-12/bin/nvcc
+# ENV CMAKE_ARGS="-DLLAMA_CUBLAS=on -DCMAKE_CUDA_ARCHITECTURES=all-major"
+# ENV FORCE_CMAKE=1
+# ENV PATH="/usr/local/cuda-12/bin:${PATH}"
+
+# WORKDIR /build
+
+# # Clone the repo and build the wheel
+# RUN git clone https://github.com/abetlen/llama-cpp-python.git .
+# RUN git submodule update --init --recursive
+# RUN python3 --version && cat pyproject.toml && head -n 70 pyproject.toml | tail -n 20 && CMAKE_ARGS="-DLLAMA_CUBLAS=on" python3 -m pip wheel . --verbose --no-deps -w dist/
+
+# # Stage 2: Slim Python runtime
+# FROM registry.levelup.cce.af.mil/cdso/containers/base-registry/ubuntu-cuda:22.04-12.1.0-rt
+
+# # Copy necessary binaries and libraries from the builder
+# # COPY --from=builder /usr/bin/wget /usr/bin/
+# # COPY --from=builder /usr/lib/x86_64-linux-gnu/libffi.so.6 /usr/lib/x86_64-linux-gnu/
+# # COPY --from=builder /usr/lib/x86_64-linux-gnu/libssl.so.1.1 /usr/lib/x86_64-linux-gnu/
+# COPY --from=builder /usr/local /usr/local 
+
+# RUN apt-get update && apt-get install -y \
+#     libexpat1 \
+#     && rm -rf /var/lib/apt/lists/*
+
+# # Install the wheel
+# COPY --from=builder /build/dist/*.whl /tmp/
+# RUN python3 --version && pip install /tmp/*.whl
+
+# # Set environment variables and library paths
+# RUN apt-get update && apt-get install -y gcc g++ && rm -rf /var/lib/apt/lists/*
+# ENV PYTHONDONTWRITEBYTECODE=1 \
+#     PYTHONUNBUFFERED=1 \
+#     LD_LIBRARY_PATH="/usr/local/lib"
+
+# WORKDIR /app
+
+# # Copy only the required application files and dependencies list
+# #COPY --from=builder /build/requirements.txt /app/
+# COPY . /app
+
+# # Ensure pip is available and install other Python dependencies
+# RUN python3 -m ensurepip && \
+#     python3 -m pip install --no-cache-dir -r requirements.txt
+
+# EXPOSE 8501
+
+# CMD ["streamlit", "run", "app_qa.py", "--server.address=0.0.0.0"]
+
+
+# Stage 1: Build environment
+FROM registry.levelup.cce.af.mil/cdso/containers/base-registry/ubuntu-cuda:22.04-12.1.0-rt as builder
+
+ENV DEBIAN_FRONTEND=noninteractive
+
+# Install Python build dependencies
+RUN apt-get update && apt-get install -y wget && rm -rf /var/lib/apt/lists/*
+RUN apt-get update && DEBIAN_FRONTEND=noninteractive apt-get install -y -o Dpkg::Options::="--force-confdef" -o Dpkg::Options::="--force-confold" gcc g++ make pkg-config && rm -rf /var/lib/apt/lists/*
+RUN apt-get update && apt-get install -y libffi-dev && rm -rf /var/lib/apt/lists/*
+RUN apt-get update && apt-get install -y libssl-dev && rm -rf /var/lib/apt/lists/*
+RUN apt-get update && apt-get install -y zlib1g-dev && rm -rf /var/lib/apt/lists/*
+RUN apt-get update && apt-get install -y libbz2-dev && rm -rf /var/lib/apt/lists/*
+RUN apt-get update && apt-get install -y libreadline-dev && rm -rf /var/lib/apt/lists/*
+RUN apt-get update && apt-get install -y libc6-dev && rm -rf /var/lib/apt/lists/*
+RUN apt-get update && apt-get install -y libsqlite3-dev && \
+    apt-get clean && rm -rf /var/lib/apt/lists/*
+
+# Download and install Python from source
+RUN wget https://www.python.org/ftp/python/3.12.2/Python-3.12.2.tgz \
+    && tar xzf Python-3.12.2.tgz \
+    && cd Python-3.12.2 \
+    && ./configure --enable-optimizations --with-ensurepip=install \
+    && make altinstall
+
+ENV PATH="/usr/local/bin:$PATH"
+ENV CUDACXX=/usr/local/cuda-12/bin/nvcc 
+ENV CMAKE_ARGS="-DLLAMA_CUBLAS=on -DCMAKE_CUDA_ARCHITECTURES=all-major"
+ENV FORCE_CMAKE=1
+
+RUN ln -s python3.12 /usr/local/bin/python3
+RUN ln -s pip3.12 /usr/local/bin/pip3
+
+RUN ls -l /usr/local/bin && python3 --version && python3 -m pip --version
+
+# Install build dependencies and CUDA toolkit
+RUN apt-get update && apt-get install -y \
+    wget \
+    build-essential \
+    libffi-dev \
+    libssl-dev \
+    git \
+    software-properties-common \
+    && wget https://developer.download.nvidia.com/compute/cuda/12.3.1/local_installers/cuda-repo-debian12-12-3-local_12.3.1-545.23.08-1_amd64.deb \
+    && dpkg -i cuda-repo-debian12-12-3-local_12.3.1-545.23.08-1_amd64.deb \
+    && cp /var/cuda-repo-debian12-12-3-local/cuda-*-keyring.gpg /usr/share/keyrings/ \
+    && apt-get update && apt-get -y install cuda-toolkit-12-3 \
+    && rm -rf /var/lib/apt/lists/*
+
+ENV PATH="/usr/local/cuda-12/bin:${PATH}"
+
+WORKDIR /build
+RUN git clone https://github.com/abetlen/llama-cpp-python.git .
+RUN git submodule update --init --recursive
+RUN python3 --version && python3 -m pip wheel . --verbose --no-deps -w dist/
+
+# Stage 2: Slim Python runtime
+FROM registry.levelup.cce.af.mil/cdso/containers/base-registry/ubuntu-cuda:22.04-12.1.0-rt
+
+# Copy necessary binaries, libraries, and Python environment from the builder
+COPY --from=builder /usr/local /usr/local
+
+# Install the wheel
+COPY --from=builder /build/dist/*.whl /tmp/
+RUN apt-get update && apt-get install -y gcc g++ \
+    && pip3 install /tmp/*.whl \
+    && rm -rf /var/lib/apt/lists/*
+
+ENV PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1 \
+    LD_LIBRARY_PATH="/usr/local/lib"
+
+WORKDIR /app
+COPY . /app
+
+# Install other Python dependencies
+RUN pip3 install --no-cache-dir -r requirements.txt
+
+EXPOSE 8501
+
+CMD ["streamlit", "run", "app_qa.py", "--server.address=0.0.0.0"]

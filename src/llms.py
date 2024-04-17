@@ -8,6 +8,7 @@ from langchain_community.llms.ctransformers import CTransformers
 from langchain_community.llms.llamacpp import LlamaCpp
 from langchain_community.llms.openai import OpenAI
 from langchain.callbacks import StreamingStdOutCallbackHandler
+from langchain_openai import ChatOpenAI
 
 from src import CFG
 from src.helpers.findenv import load_env
@@ -35,19 +36,25 @@ def build_llm():
                 "context_length": CFG.LLM_CONFIG.CONTEXT_LENGTH,
             },
         )
-    config = {
-        "max_tokens": CFG.LLM_CONFIG.MAX_NEW_TOKENS,
-        "temperature": CFG.LLM_CONFIG.TEMPERATURE,
-        "repeat_penalty": CFG.LLM_CONFIG.REPETITION_PENALTY,
-        "n_ctx": CFG.LLM_CONFIG.CONTEXT_LENGTH,
-    }
-    if CFG.DEVICE != "cpu":
-        config["n_gpu_layers"] = CFG.LLM_CONFIG.N_GPU_LAYERS
+    elif CFG.USE_LLAMACPP_SERVER:  # Configuration to use the LlamaCpp server
+        return build_llamacpp_server(
+            CFG.LLM_PATH,  # You'll need to define this in your configuration
+        )
+    else:
+        # Default to a standard LlamaCpp setup
+        config = {
+            "max_tokens": CFG.LLM_CONFIG.MAX_NEW_TOKENS,
+            "temperature": CFG.LLM_CONFIG.TEMPERATURE,
+            "repeat_penalty": CFG.LLM_CONFIG.REPETITION_PENALTY,
+            "n_ctx": CFG.LLM_CONFIG.CONTEXT_LENGTH,
+        }
+        if CFG.DEVICE != "cpu":
+            config["n_gpu_layers"] = CFG.LLM_CONFIG.N_GPU_LAYERS
 
-    return build_llamacpp(
-        os.path.join(CFG.MODELS_DIR, CFG.LLM_PATH),
-        config=config,
-    )
+        return build_llamacpp(
+            os.path.join(CFG.MODELS_DIR, CFG.LLM_PATH),
+            config=config,
+        )
 
 
 def build_ctransformers(
@@ -82,6 +89,22 @@ def build_openai(model_name: str, config: Optional[dict] = None, **kwargs):
     llm = OpenAI(model_name=model_name, **config, **kwargs)
     return llm
 
+
+def build_llamacpp_server(endpoint: str, debug: bool = False):
+    """Builds LLM using LlamaCpp."""
+    #model_kwargs = {"repeat_penalty": 1.1} 
+    llm = ChatOpenAI(
+        openai_api_base=endpoint,
+        temperature=0.1,
+        model_name="model_deployed",
+        openai_api_key="sk-no-key-required",
+        streaming=True,
+        max_tokens=1024,
+        #model_kwargs=model_kwargs,
+        #callback_manager=[StreamingStdOutCallbackHandler()] if debug else None,
+    )
+    print(llm)
+    return llm
 
 def build_llamacpp(
     model_path: str, config: Optional[dict] = None, debug: bool = False, **kwargs
